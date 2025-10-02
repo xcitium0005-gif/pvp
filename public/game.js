@@ -1,10 +1,7 @@
 // game.js
-// Main game engine: networking, drawing, inputs
-// Mila-specific logic is imported from mila.js
+// Main engine
+import { milaBasicAttack, milaSkill, milaOnHit, milaApplyKnockback } from "./mila.js";
 
-import { milaBasicAttack, milaSkill, milaOnHit } from "./mila.js";
-
-// ---- Setup canvas ----
 let canvas = document.getElementById("game");
 let ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * 0.9;
@@ -27,7 +24,8 @@ export let state = {
   myHP: 100,
   enemyHP: 100,
   projectiles: {},
-  nextProjId: 1
+  nextProjId: 1,
+  lastAttackTime: 0
 };
 
 // ---- Cooldowns ----
@@ -127,7 +125,13 @@ function setupChannel() {
       case "spawn": state.projectiles[msg.id] = { ...msg, born: performance.now() }; break;
       case "hp_update": 
         if (msg.target === "enemy") state.enemyHP = msg.hp;
-        if (msg.target === "you") state.myHP = msg.hp;
+        if (msg.target === "you") {
+          state.myHP = msg.hp;
+          if (msg.knockback) {
+            state.myX += msg.knockback.dx;
+            state.myY += msg.knockback.dy;
+          }
+        }
         break;
       case "hp_sync": state.enemyHP = msg.hp; break;
     }
@@ -146,19 +150,15 @@ function doAttack() {
   canAttack = false;
   setTimeout(()=>canAttack=true, 500);
 
-  if (state.myChar === "mila") {
-    milaBasicAttack(state, broadcast);
-  }
+  if (state.myChar === "mila") milaBasicAttack(state, broadcast);
 }
 
 function doSkill() {
   if (!canSkill || !state.myChar) return;
   canSkill = false;
-  setTimeout(()=>canSkill=true, 8000); // 8s cooldown
+  setTimeout(()=>canSkill=true, 8000);
 
-  if (state.myChar === "mila") {
-    milaSkill(state, broadcast);
-  }
+  if (state.myChar === "mila") milaSkill(state, broadcast);
 }
 
 // ---- Buttons ----
@@ -205,21 +205,21 @@ function loop() {
     if (now - p.born > p.ttl) { delete state.projectiles[id]; continue; }
     p.x += p.vx; p.y += p.vy;
 
-    // collisions
+    // Only owner computes damage
     if (p.owner==="you") {
       const dx=state.enemyX-p.x, dy=state.enemyY-p.y;
       if (Math.hypot(dx,dy)<80) { 
-        let dmg = milaOnHit(p,state,broadcast);
+        let dmg = milaOnHit(p,state);
         state.enemyHP=Math.max(0,state.enemyHP-dmg);
-        broadcast({type:"hp_update",target:"enemy",hp:state.enemyHP});
-        delete state.projectiles[id];
-      }
-    } else if (p.owner==="enemy") {
-      const dx=state.myX-p.x, dy=state.myY-p.y;
-      if (Math.hypot(dx,dy)<80) { 
-        let dmg = milaOnHit(p,state,broadcast);
-        state.myHP=Math.max(0,state.myHP-dmg);
-        broadcast({type:"hp_update",target:"you",hp:state.myHP});
+
+        // knockback if orb
+        let kb = null;
+        if (p.kind==="mila_energy") {
+          const len=Math.hypot(dx,dy)||1;
+          kb = { dx:(dx/len)*80, dy:(dy/len)*80 };
+        }
+
+        broadcast({type:"hp_update",target:"enemy",hp:state.enemyHP,knockback:kb});
         delete state.projectiles[id];
       }
     }
@@ -228,9 +228,14 @@ function loop() {
   // draw arena
   ctx.fillStyle="#2a2a2a"; ctx.fillRect(60,60,canvas.width-120,canvas.height-140);
 
-  // draw players
+  // draw players (with invisibility for Mila)
   if (state.enemyChar) ctx.drawImage(sprites[state.enemyChar], state.enemyX-64, state.enemyY-64, 128,128);
-  if (state.myChar) ctx.drawImage(sprites[state.myChar], state.myX-64, state.myY-64, 128,128);
+  if (state.myChar) {
+    let invisible = (state.myChar==="mila" && (performance.now()-state.lastAttackTime>3000));
+    if (invisible) ctx.globalAlpha=0.3;
+    ctx.drawImage(sprites[state.myChar], state.myX-64, state.myY-64, 128,128);
+    ctx.globalAlpha=1.0;
+  }
 
   // draw projectiles
   for (let id in state.projectiles) {
