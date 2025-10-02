@@ -1,3 +1,9 @@
+// game.js
+// Main game engine: networking, drawing, inputs
+// Mila-specific logic is imported from mila.js
+
+import { milaBasicAttack, milaSkill, milaOnHit } from "./mila.js";
+
 // ---- Setup canvas ----
 let canvas = document.getElementById("game");
 let ctx = canvas.getContext("2d");
@@ -11,11 +17,18 @@ let candidateQueue = [];
 let remoteDescSet = false;
 
 // ---- Game state ----
-let myChar = null;
-let myX = canvas.width * 0.2, myY = canvas.height * 0.5;
-let enemyX = canvas.width * 0.8, enemyY = canvas.height * 0.5;
-let enemyChar = null;
-let myHP = 100, enemyHP = 100;
+export let state = {
+  myChar: null,
+  myX: canvas.width * 0.2,
+  myY: canvas.height * 0.5,
+  enemyX: canvas.width * 0.8,
+  enemyY: canvas.height * 0.5,
+  enemyChar: null,
+  myHP: 100,
+  enemyHP: 100,
+  projectiles: {},
+  nextProjId: 1
+};
 
 // ---- Cooldowns ----
 let canAttack = true, canSkill = true;
@@ -23,21 +36,26 @@ let canAttack = true, canSkill = true;
 // ---- Movement ----
 let joystick = { dx: 0, dy: 0 };
 
-// ---- Projectiles ----
-let projectiles = {};
-let nextProjId = 1;
+// ---- Sprites ----
+let sprites = {};
+["mila","gustav","fyero"].forEach(name=>{
+  sprites[name] = new Image();
+  sprites[name].src = name + ".png";
+});
+let milaSlash = new Image(); milaSlash.src = "mila_slash.png";
+let milaEnergy = new Image(); milaEnergy.src = "mila_energy.png";
 
 // ---- Select Character ----
-function selectChar(name) {
-  myChar = name;
+window.selectChar = function(name) {
+  state.myChar = name;
   console.log("🎯 You selected:", name);
   if (dataChannel && dataChannel.readyState === "open") {
-    dataChannel.send(JSON.stringify({ type:"char", char: myChar }));
+    dataChannel.send(JSON.stringify({ type:"char", char: state.myChar }));
   }
-}
+};
 
-// ---- Networking Setup ----
-function connect(host) {
+// ---- Networking ----
+window.connect = function(host) {
   isHost = host;
   const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws";
   ws = new WebSocket(wsUrl);
@@ -85,7 +103,7 @@ function connect(host) {
       }
     }
   };
-}
+};
 
 async function ensurePc() {
   if (pc) return pc;
@@ -98,20 +116,20 @@ async function ensurePc() {
 
 function setupChannel() {
   dataChannel.onopen = () => {
-    if (myChar) dataChannel.send(JSON.stringify({ type:"char", char: myChar }));
-    dataChannel.send(JSON.stringify({ type:"hp_sync", hp: myHP }));
+    if (state.myChar) dataChannel.send(JSON.stringify({ type:"char", char: state.myChar }));
+    dataChannel.send(JSON.stringify({ type:"hp_sync", hp: state.myHP }));
   };
   dataChannel.onmessage = (e) => {
     let msg = JSON.parse(e.data);
     switch(msg.type) {
-      case "pos": enemyX = msg.x; enemyY = msg.y; break;
-      case "char": enemyChar = msg.char; break;
-      case "spawn": projectiles[msg.id] = { ...msg, born: performance.now() }; break;
+      case "pos": state.enemyX = msg.x; state.enemyY = msg.y; break;
+      case "char": state.enemyChar = msg.char; break;
+      case "spawn": state.projectiles[msg.id] = { ...msg, born: performance.now() }; break;
       case "hp_update": 
-        if (msg.target === "enemy") enemyHP = msg.hp;
-        if (msg.target === "you") myHP = msg.hp;
+        if (msg.target === "enemy") state.enemyHP = msg.hp;
+        if (msg.target === "you") state.myHP = msg.hp;
         break;
-      case "hp_sync": enemyHP = msg.hp; break;
+      case "hp_sync": state.enemyHP = msg.hp; break;
     }
   };
 }
@@ -123,36 +141,24 @@ function broadcast(obj) {
 }
 
 // ---- Combat ----
-function spawnProjectile(kind, owner, x, y, vx, vy, ttl=2000) {
-  const id = (nextProjId++).toString();
-  projectiles[id] = { id, kind, owner, x, y, vx, vy, ttl, born: performance.now() };
-  broadcast({ type:"spawn", ...projectiles[id] });
-  return projectiles[id];
-}
-
 function doAttack() {
-  if (!canAttack || !myChar) return;
+  if (!canAttack || !state.myChar) return;
   canAttack = false;
-  setTimeout(()=>canAttack=true, 500); // 0.5s cooldown
+  setTimeout(()=>canAttack=true, 500);
 
-  if (myChar === "fyero") spawnProjectile("fyero_basic","you",myX+30,myY,0,0,400);
-  if (myChar === "gustav") spawnProjectile("gustav_basic","you",myX,myY,6,0,2000);
-  if (myChar === "mila") spawnProjectile("mila_basic","you",myX+30,myY,0,0,200);
+  if (state.myChar === "mila") {
+    milaBasicAttack(state, broadcast);
+  }
 }
 
 function doSkill() {
-  if (!canSkill || !myChar) return;
+  if (!canSkill || !state.myChar) return;
   canSkill = false;
-  setTimeout(()=>canSkill=true, 5000); // 5s cooldown
+  setTimeout(()=>canSkill=true, 8000); // 8s cooldown
 
-  if (myChar === "fyero") spawnProjectile("fyero_skill","you",myX+30,myY,0,0,700);
-  if (myChar === "gustav") {
-    for (let i=0;i<6;i++) {
-      const angle = i*(Math.PI*2/6);
-      spawnProjectile("gustav_skill","you",myX,myY,Math.cos(angle)*4,Math.sin(angle)*4,2200);
-    }
+  if (state.myChar === "mila") {
+    milaSkill(state, broadcast);
   }
-  if (myChar === "mila") spawnProjectile("mila_skill","you",myX+30,myY,2,0,2500);
 }
 
 // ---- Buttons ----
@@ -186,26 +192,36 @@ function loop() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   // movement
-  myX = Math.max(32, Math.min(canvas.width-32, myX+joystick.dx));
-  myY = Math.max(32, Math.min(canvas.height-32, myY+joystick.dy));
+  state.myX = Math.max(32, Math.min(canvas.width-32, state.myX+joystick.dx));
+  state.myY = Math.max(32, Math.min(canvas.height-32, state.myY+joystick.dy));
 
   // send position
-  broadcast({ type:"pos", x: myX, y: myY });
+  broadcast({ type:"pos", x: state.myX, y: state.myY });
 
   // simulate projectiles
   const now = performance.now();
-  for (let id of Object.keys(projectiles)) {
-    const p = projectiles[id];
-    if (now - p.born > p.ttl) { delete projectiles[id]; continue; }
+  for (let id of Object.keys(state.projectiles)) {
+    const p = state.projectiles[id];
+    if (now - p.born > p.ttl) { delete state.projectiles[id]; continue; }
     p.x += p.vx; p.y += p.vy;
 
     // collisions
     if (p.owner==="you") {
-      const dx=enemyX-p.x, dy=enemyY-p.y;
-      if (Math.hypot(dx,dy)<40) { enemyHP=Math.max(0,enemyHP-10); broadcast({type:"hp_update",target:"enemy",hp:enemyHP}); delete projectiles[id]; }
+      const dx=state.enemyX-p.x, dy=state.enemyY-p.y;
+      if (Math.hypot(dx,dy)<80) { 
+        let dmg = milaOnHit(p,state,broadcast);
+        state.enemyHP=Math.max(0,state.enemyHP-dmg);
+        broadcast({type:"hp_update",target:"enemy",hp:state.enemyHP});
+        delete state.projectiles[id];
+      }
     } else if (p.owner==="enemy") {
-      const dx=myX-p.x, dy=myY-p.y;
-      if (Math.hypot(dx,dy)<40) { myHP=Math.max(0,myHP-10); broadcast({type:"hp_update",target:"you",hp:myHP}); delete projectiles[id]; }
+      const dx=state.myX-p.x, dy=state.myY-p.y;
+      if (Math.hypot(dx,dy)<80) { 
+        let dmg = milaOnHit(p,state,broadcast);
+        state.myHP=Math.max(0,state.myHP-dmg);
+        broadcast({type:"hp_update",target:"you",hp:state.myHP});
+        delete state.projectiles[id];
+      }
     }
   }
 
@@ -213,25 +229,25 @@ function loop() {
   ctx.fillStyle="#2a2a2a"; ctx.fillRect(60,60,canvas.width-120,canvas.height-140);
 
   // draw players
-  if (enemyChar) { ctx.fillStyle="orange"; ctx.beginPath(); ctx.arc(enemyX,enemyY,20,0,2*Math.PI); ctx.fill(); }
-  if (myChar) { ctx.fillStyle="cyan"; ctx.beginPath(); ctx.arc(myX,myY,20,0,2*Math.PI); ctx.fill(); }
+  if (state.enemyChar) ctx.drawImage(sprites[state.enemyChar], state.enemyX-64, state.enemyY-64, 128,128);
+  if (state.myChar) ctx.drawImage(sprites[state.myChar], state.myX-64, state.myY-64, 128,128);
 
-  // draw projectiles (fallback if no images)
-  ctx.fillStyle="white";
-  for (let id in projectiles) {
-    let p=projectiles[id];
-    ctx.beginPath(); ctx.arc(p.x,p.y,8,0,2*Math.PI); ctx.fill();
+  // draw projectiles
+  for (let id in state.projectiles) {
+    let p=state.projectiles[id];
+    if (p.kind==="mila_slash") ctx.drawImage(milaSlash,p.x-32,p.y-32,64,64);
+    if (p.kind==="mila_energy") ctx.drawImage(milaEnergy,p.x-128,p.y-128,256,256);
   }
 
   // HP bars
-  drawHP(myX,myY,myHP);
-  drawHP(enemyX,enemyY,enemyHP);
+  drawHP(state.myX,state.myY,state.myHP);
+  drawHP(state.enemyX,state.enemyY,state.enemyHP);
 
   requestAnimationFrame(loop);
 }
 loop();
 
 function drawHP(x,y,hp){
-  ctx.fillStyle="red"; ctx.fillRect(x-30,y-50,60,6);
-  ctx.fillStyle="lime"; ctx.fillRect(x-30,y-50,(hp/100)*60,6);
+  ctx.fillStyle="red"; ctx.fillRect(x-30,y-70,60,6);
+  ctx.fillStyle="lime"; ctx.fillRect(x-30,y-70,(hp/100)*60,6);
 }
