@@ -2,23 +2,53 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>P2P Test Game</title>
+  <title>P2P Arena Test</title>
   <style>
-    canvas { background: #222; display: block; margin: auto; touch-action: none; }
-    #ui { text-align: center; margin: 10px; }
-    button { font-size: 20px; margin: 5px; padding: 10px; }
+    body {
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    h2 { margin: 10px 0; }
+    canvas {
+      background: #222;
+      display: block;
+      margin: 10px auto;
+      touch-action: none; /* prevent scroll when touching */
+    }
+    #ui {
+      margin: 10px auto;
+      padding: 10px;
+    }
+    button {
+      font-size: 20px;
+      margin: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      border: none;
+      background: #444;
+      color: white;
+    }
+    button:active {
+      background: #666;
+    }
   </style>
 </head>
 <body>
   <div id="ui">
-    <h2>Select Character</h2>
-    <button onclick="selectChar('mila')">Mila</button>
-    <button onclick="selectChar('gustav')">Gustav</button>
-    <button onclick="selectChar('fyero')">Fyero</button>
-    <br>
-    <button onclick="connect(true)">Host</button>
-    <button onclick="connect(false)">Join</button>
+    <h2>Choose Your Character</h2>
+    <button onclick="selectChar('mila')">Mila 🗡️</button>
+    <button onclick="selectChar('gustav')">Gustav 🌿</button>
+    <button onclick="selectChar('fyero')">Fyero 🔥</button>
+
+    <h2>Connection</h2>
+    <button onclick="connect(true)">Host Match</button>
+    <button onclick="connect(false)">Join Match</button>
   </div>
+
   <canvas id="game" width="600" height="400"></canvas>
 
   <script src="game.js"></script>
