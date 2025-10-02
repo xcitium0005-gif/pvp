@@ -1,14 +1,14 @@
 // mila.js
-// Mila’s attacks, skills, lifesteal, knockback, invisibility (fast-paced system)
+// Mila’s attacks, skill (toward enemy), lifesteal, and helpers for the fast-HP rules.
 
 export function milaBasicAttack(state, broadcast) {
-  state.lastAttackTime = performance.now(); // reset invisibility timer
+  state.lastAttackTime = performance.now(); // reset invis timer
   const id = (state.nextProjId++).toString();
   const slash = {
     id,
     kind: "mila_slash",
-    owner: "you",
-    x: state.myX + 40,
+    owner: "you",          // from my perspective
+    x: state.myX + 40,     // just in front
     y: state.myY,
     vx: 0, vy: 0,
     ttl: 200,
@@ -21,11 +21,11 @@ export function milaBasicAttack(state, broadcast) {
 export function milaSkill(state, broadcast) {
   state.lastAttackTime = performance.now();
 
-  // Direction toward enemy
+  // Aim the giant orb toward current enemy position
   const dx = state.enemyX - state.myX;
   const dy = state.enemyY - state.myY;
   const len = Math.hypot(dx, dy) || 1;
-  const vx = (dx / len) * 2; // very slow orb
+  const vx = (dx / len) * 2; // very slow
   const vy = (dy / len) * 2;
 
   const id = (state.nextProjId++).toString();
@@ -43,22 +43,15 @@ export function milaSkill(state, broadcast) {
   broadcast({ type:"spawn", ...orb });
 }
 
+// Return damage dealt (fast-HP system)
 export function milaOnHit(proj, state) {
   if (proj.kind === "mila_slash") {
-    // Lifesteal: heal 1, max 4
-    state.myHP = Math.min(4, state.myHP + 1);
-    return 1; // damage dealt
+    // Lifesteal +1 up to Mila max (4)
+    state.myHP = Math.min(state.myMaxHP, state.myHP + 1);
+    return 1;
   }
   if (proj.kind === "mila_energy") {
-    return 2; // heavy damage
+    return 2;
   }
   return 0;
-}
-
-export function milaApplyKnockback(state, proj, distance=80) {
-  const dx = state.myX - proj.x;
-  const dy = state.myY - proj.y;
-  const len = Math.hypot(dx, dy) || 1;
-  state.myX += (dx / len) * distance;
-  state.myY += (dy / len) * distance;
 }
