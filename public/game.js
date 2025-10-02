@@ -6,6 +6,8 @@ let ws;
 let pc;
 let dataChannel;
 let isHost = false;
+let candidateQueue = [];   // NEW: hold ICE candidates until remote desc is set
+let remoteDescSet = false; // NEW: flag when setRemoteDescription is done
 
 // --- game state ---
 let myChar = null;
@@ -70,6 +72,11 @@ function connect(host) {
     if (msg.offer && !isHost) {
       console.log("📩 Got offer");
       await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
+      remoteDescSet = true; // mark
+      // flush queued ICE
+      candidateQueue.forEach(c => pc.addIceCandidate(c));
+      candidateQueue = [];
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       ws.send(JSON.stringify({ answer }));
@@ -79,14 +86,24 @@ function connect(host) {
     if (msg.answer && isHost) {
       console.log("📩 Got answer");
       await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+      remoteDescSet = true; // mark
+      // flush queued ICE
+      candidateQueue.forEach(c => pc.addIceCandidate(c));
+      candidateQueue = [];
     }
 
     if (msg.candidate) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-        console.log("➕ Added ICE candidate");
-      } catch (e) {
-        console.warn("⚠️ ICE add failed", e);
+      const cand = new RTCIceCandidate(msg.candidate);
+      if (remoteDescSet) {
+        try {
+          await pc.addIceCandidate(cand);
+          console.log("➕ Added ICE candidate");
+        } catch (e) {
+          console.warn("⚠️ ICE add failed", e);
+        }
+      } else {
+        console.log("🕐 Queued ICE candidate (waiting for remote desc)");
+        candidateQueue.push(cand);
       }
     }
   };
