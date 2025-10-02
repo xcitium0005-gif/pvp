@@ -46,7 +46,6 @@ let milaEnergy = new Image(); milaEnergy.src = "mila_energy.png";
 // ---- Select Character ----
 window.selectChar = function(name) {
   state.myChar = name;
-  console.log("🎯 You selected:", name);
   if (dataChannel && dataChannel.readyState === "open") {
     dataChannel.send(JSON.stringify({ type:"char", char: state.myChar }));
   }
@@ -228,13 +227,27 @@ function loop() {
   // draw arena
   ctx.fillStyle="#2a2a2a"; ctx.fillRect(60,60,canvas.width-120,canvas.height-140);
 
-  // draw players (with invisibility for Mila)
-  if (state.enemyChar) ctx.drawImage(sprites[state.enemyChar], state.enemyX-64, state.enemyY-64, 128,128);
+  // draw enemy (if Mila + invisible, do NOT draw)
+  if (state.enemyChar) {
+    if (state.enemyChar === "mila" && (performance.now()-state.lastAttackTime>3000)) {
+      // invisible to me, skip drawing
+    } else {
+      ctx.drawImage(sprites[state.enemyChar], state.enemyX-64, state.enemyY-64, 128,128);
+    }
+  }
+
+  // draw my player (if Mila + invisible, draw semi-transparent)
   if (state.myChar) {
-    let invisible = (state.myChar==="mila" && (performance.now()-state.lastAttackTime>3000));
-    if (invisible) ctx.globalAlpha=0.3;
-    ctx.drawImage(sprites[state.myChar], state.myX-64, state.myY-64, 128,128);
-    ctx.globalAlpha=1.0;
+    if (state.myChar === "mila") {
+      const invisible = (performance.now() - state.lastAttackTime > 3000);
+      if (invisible) {
+        ctx.globalAlpha=0.5; // semi-transparent to self
+      }
+      ctx.drawImage(sprites[state.myChar], state.myX-64, state.myY-64, 128,128);
+      ctx.globalAlpha=1.0;
+    } else {
+      ctx.drawImage(sprites[state.myChar], state.myX-64, state.myY-64, 128,128);
+    }
   }
 
   // draw projectiles
