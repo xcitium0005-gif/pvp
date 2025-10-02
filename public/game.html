@@ -6,26 +6,20 @@
   <style>
     body {
       background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
       margin: 0;
       padding: 0;
       overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: white;
+      text-align: center;
     }
     h2 { margin: 10px 0; }
-    canvas {
-      background: #222;
-      display: block;
-      margin: 10px auto;
-      touch-action: none; /* prevent scroll when touching */
-    }
     #ui {
       margin: 10px auto;
       padding: 10px;
     }
     button {
-      font-size: 20px;
+      font-size: 18px;
       margin: 8px;
       padding: 12px 20px;
       border-radius: 10px;
@@ -35,10 +29,17 @@
     }
     button:active { background: #666; }
 
-    /* Joystick container */
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #222;
+      touch-action: none;
+    }
+
+    /* Joystick */
     #joystick {
       position: absolute;
-      bottom: 60px;
+      bottom: 80px;
       left: 60px;
       width: 120px;
       height: 120px;
@@ -56,6 +57,28 @@
       border-radius: 50%;
       background: rgba(255,255,255,0.4);
     }
+
+    /* Combat buttons */
+    #attackBtn, #skillBtn {
+      position: absolute;
+      bottom: 100px;
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      font-size: 18px;
+      border: none;
+      color: white;
+    }
+    #attackBtn {
+      right: 60px;
+      background: crimson;
+    }
+    #skillBtn {
+      right: 170px;
+      background: royalblue;
+    }
+    #attackBtn:active { background: darkred; }
+    #skillBtn:active { background: navy; }
   </style>
 </head>
 <body>
@@ -70,12 +93,14 @@
     <button onclick="connect(false)">Join Match</button>
   </div>
 
-  <canvas id="game" width="600" height="400"></canvas>
+  <canvas id="game"></canvas>
 
-  <!-- Joystick UI -->
-  <div id="joystick">
-    <div id="stick"></div>
-  </div>
+  <!-- Joystick -->
+  <div id="joystick"><div id="stick"></div></div>
+
+  <!-- Combat buttons -->
+  <button id="attackBtn">Attack</button>
+  <button id="skillBtn">Skill</button>
 
   <script src="game.js"></script>
 </body>
