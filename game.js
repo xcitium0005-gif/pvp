@@ -9,6 +9,7 @@ let isHost = false;
 let myChar = null;
 let myX = 100, myY = 200;
 let enemyX = 400, enemyY = 200;
+let enemyChar = null; // sync enemy character
 
 // === Mobile joystick variables ===
 let joystick = { active: false, startX: 0, startY: 0, dx: 0, dy: 0 };
@@ -24,12 +25,20 @@ let sprites = {};
 function selectChar(name) {
   myChar = name;
   console.log("Selected:", name);
+
+  // If already connected, send my char choice
+  if (dataChannel && dataChannel.readyState === "open") {
+    dataChannel.send(JSON.stringify({type:"char", char: myChar}));
+  }
 }
 
 // === Connect via signaling ===
 function connect(host) {
   isHost = host;
-  ws = new WebSocket("wss://" + window.location.host); // Render uses same domain
+  ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") + window.location.host
+  );
+
   ws.onmessage = async (event) => {
     let msg = JSON.parse(event.data);
 
@@ -65,9 +74,22 @@ function connect(host) {
 // === Data channel handler ===
 function setupChannel() {
   dataChannel.onmessage = (e) => {
-    let pos = JSON.parse(e.data);
-    enemyX = pos.x;
-    enemyY = pos.y;
+    let msg = JSON.parse(e.data);
+
+    if (msg.type === "pos") {
+      enemyX = msg.x;
+      enemyY = msg.y;
+    }
+    if (msg.type === "char") {
+      enemyChar = msg.char;
+    }
+  };
+
+  dataChannel.onopen = () => {
+    console.log("Data channel open");
+    if (myChar) {
+      dataChannel.send(JSON.stringify({type:"char", char: myChar}));
+    }
   };
 }
 
@@ -98,14 +120,18 @@ function loop() {
 
   // Send position
   if (dataChannel && dataChannel.readyState === "open") {
-    dataChannel.send(JSON.stringify({x:myX,y:myY}));
+    dataChannel.send(JSON.stringify({type:"pos", x:myX, y:myY}));
   }
 
   // Draw my char
-  if (myChar) ctx.drawImage(sprites[myChar], myX-32, myY-32, 64,64);
+  if (myChar) {
+    ctx.drawImage(sprites[myChar], myX-32, myY-32, 64,64);
+  }
 
-  // Draw enemy
-  ctx.drawImage(sprites["mila"], enemyX-32, enemyY-32, 64,64); // placeholder, you can sync enemy's char later
+  // Draw enemy char (if known)
+  if (enemyChar) {
+    ctx.drawImage(sprites[enemyChar], enemyX-32, enemyY-32, 64,64);
+  }
 
   requestAnimationFrame(loop);
 }
