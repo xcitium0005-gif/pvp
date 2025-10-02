@@ -38,51 +38,16 @@ function connect(host) {
   isHost = host;
   console.log(isHost ? "🟢 Hosting..." : "🟣 Joining...");
 
-  // WebSocket to the same origin, on /ws
   const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws";
   ws = new WebSocket(wsUrl);
 
-  ws.onopen = () => console.log("✅ Connected to signaling server:", wsUrl);
-  ws.onerror = (err) => console.error("❌ WebSocket error", err);
+  ws.onopen = async () => {
+    console.log("✅ Connected to signaling server:", wsUrl);
 
-  ws.onmessage = async (event) => {
-    try {
-      let msg = JSON.parse(event.data);
+    await ensurePc();
 
-      if (msg.offer && !isHost) {
-        console.log("📩 Got offer");
-        await ensurePc();
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        ws.send(JSON.stringify({ answer }));
-        console.log("📤 Sent answer");
-      }
-
-      if (msg.answer && isHost) {
-        console.log("📩 Got answer");
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
-      }
-
-      if (msg.candidate) {
-        // Some browsers send null candidates near the end; ignore safely
-        if (msg.candidate.candidate) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-            // console.log("➕ Added ICE candidate");
-          } catch (e) {
-            console.warn("ICE add failed", e);
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Signaling message parse error:", e);
-    }
-  };
-
-  // Create the peer connection + data channel
-  ensurePc().then(async () => {
     if (isHost) {
+      // Host creates DataChannel + Offer
       dataChannel = pc.createDataChannel("game");
       setupChannel();
       const offer = await pc.createOffer();
@@ -90,15 +55,44 @@ function connect(host) {
       ws.send(JSON.stringify({ offer }));
       console.log("📤 Sent offer");
     } else {
+      // Joiner will receive DataChannel
       pc.ondatachannel = (e) => {
         dataChannel = e.channel;
         setupChannel();
       };
     }
-  });
+  };
+
+  ws.onerror = (err) => console.error("❌ WebSocket error", err);
+
+  ws.onmessage = async (event) => {
+    let msg = JSON.parse(event.data);
+
+    if (msg.offer && !isHost) {
+      console.log("📩 Got offer");
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      ws.send(JSON.stringify({ answer }));
+      console.log("📤 Sent answer");
+    }
+
+    if (msg.answer && isHost) {
+      console.log("📩 Got answer");
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+    }
+
+    if (msg.candidate) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+      } catch (e) {
+        console.warn("⚠️ ICE add failed", e);
+      }
+    }
+  };
 }
 
-// Create pc if needed (adds a public STUN server for reliability)
+// --- ensure PeerConnection exists ---
 async function ensurePc() {
   if (pc) return pc;
 
@@ -133,9 +127,7 @@ function setupChannel() {
   dataChannel.onclose = () => console.log("🔻 DataChannel closed");
 
   dataChannel.onmessage = (e) => {
-    let msg = {};
-    try { msg = JSON.parse(e.data); } catch { return; }
-
+    let msg = JSON.parse(e.data);
     if (msg.type === "pos") {
       enemyX = msg.x;
       enemyY = msg.y;
@@ -182,19 +174,14 @@ joy.addEventListener("touchend", e=>{
 function loop() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // Move & clamp to canvas
   myX = Math.max(32, Math.min(canvas.width - 32,  myX + joystick.dx));
   myY = Math.max(32, Math.min(canvas.height - 32, myY + joystick.dy));
 
-  // Send my position if channel open
   if (dataChannel && dataChannel.readyState === "open") {
     dataChannel.send(JSON.stringify({ type:"pos", x: myX, y: myY }));
   }
 
-  // Draw me
   if (myChar) ctx.drawImage(sprites[myChar], myX-32, myY-32, 64,64);
-
-  // Draw enemy
   if (enemyChar) ctx.drawImage(sprites[enemyChar], enemyX-32, enemyY-32, 64,64);
 
   requestAnimationFrame(loop);
