@@ -12,7 +12,7 @@ let enemyX = 400, enemyY = 200;
 let enemyChar = null; // sync enemy character
 
 // === Mobile joystick variables ===
-let joystick = { active: false, startX: 0, startY: 0, dx: 0, dy: 0 };
+let joystick = { dx: 0, dy: 0 };
 
 // === Character images ===
 let sprites = {};
@@ -93,21 +93,42 @@ function setupChannel() {
   };
 }
 
-// === Joystick control ===
-canvas.addEventListener("touchstart", e=>{
-  joystick.active = true;
-  joystick.startX = e.touches[0].clientX;
-  joystick.startY = e.touches[0].clientY;
+// === Joystick UI logic ===
+let joy = document.getElementById("joystick");
+let stick = document.getElementById("stick");
+
+let centerX = joy.offsetLeft + joy.offsetWidth/2;
+let centerY = joy.offsetTop + joy.offsetHeight/2;
+
+function getDistance(x1,y1,x2,y2){
+  return Math.sqrt((x2-x1)**2+(y2-y1)**2);
+}
+
+joy.addEventListener("touchmove", e=>{
+  e.preventDefault();
+  let touch = e.touches[0];
+  let dx = touch.clientX - centerX;
+  let dy = touch.clientY - centerY;
+
+  let dist = getDistance(0,0,dx,dy);
+  let maxDist = 40; // max stick radius
+  if (dist > maxDist) {
+    dx = dx / dist * maxDist;
+    dy = dy / dist * maxDist;
+  }
+
+  stick.style.left = 40 + dx + "px";
+  stick.style.top = 40 + dy + "px";
+
+  joystick.dx = dx/10; // adjust sensitivity
+  joystick.dy = dy/10;
 });
-canvas.addEventListener("touchmove", e=>{
-  if (!joystick.active) return;
-  let dx = e.touches[0].clientX - joystick.startX;
-  let dy = e.touches[0].clientY - joystick.startY;
-  joystick.dx = dx/30; joystick.dy = dy/30;
-});
-canvas.addEventListener("touchend", e=>{
-  joystick.active = false;
-  joystick.dx = joystick.dy = 0;
+joy.addEventListener("touchend", e=>{
+  e.preventDefault();
+  stick.style.left = "40px";
+  stick.style.top = "40px";
+  joystick.dx = 0;
+  joystick.dy = 0;
 });
 
 // === Game loop ===
