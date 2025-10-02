@@ -5,7 +5,7 @@ const path = require("path");
 const PORT = process.env.PORT || 3000;
 const app = express();
 
-// Serve static files (game.html, game.js, sprites)
+// Serve static files from /public (game.html, js, images)
 app.use(express.static(path.join(__dirname, "public")));
 
 const server = app.listen(PORT, () => {
@@ -14,6 +14,7 @@ const server = app.listen(PORT, () => {
 
 // WebSocket signaling
 const wss = new WebSocket.Server({ server });
+
 let clients = [];
 
 wss.on("connection", (ws) => {
