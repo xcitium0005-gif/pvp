@@ -5,8 +5,13 @@ const path = require("path");
 const PORT = process.env.PORT || 3000;
 const app = express();
 
-// Serve static files from /public (game.html, js, images)
+// Serve everything in /public
 app.use(express.static(path.join(__dirname, "public")));
+
+// ✅ Force / to return game.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "game.html"));
+});
 
 const server = app.listen(PORT, () => {
   console.log("Server running on port " + PORT);
