@@ -1,5 +1,5 @@
 // mila.js
-// Mila’s attacks, skills, and on-hit effects
+// Mila’s attacks, skills, lifesteal, knockback, invisibility
 
 export function milaBasicAttack(state, broadcast) {
   state.lastAttackTime = performance.now(); // reset invisibility timer
@@ -21,7 +21,7 @@ export function milaBasicAttack(state, broadcast) {
 export function milaSkill(state, broadcast) {
   state.lastAttackTime = performance.now();
 
-  // Direction towards enemy
+  // Direction toward enemy
   const dx = state.enemyX - state.myX;
   const dy = state.enemyY - state.myY;
   const len = Math.hypot(dx, dy) || 1;
@@ -47,10 +47,10 @@ export function milaOnHit(proj, state) {
   if (proj.kind === "mila_slash") {
     // Lifesteal
     state.myHP = Math.min(100, state.myHP + 5);
-    return 8; // damage to enemy
+    return 8; // damage
   }
   if (proj.kind === "mila_energy") {
-    return 30; // heavy damage, knockback handled separately
+    return 30; // heavy damage
   }
   return 0;
 }
