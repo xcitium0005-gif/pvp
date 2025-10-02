@@ -2,9 +2,9 @@ let canvas = document.getElementById("game");
 let ctx = canvas.getContext("2d");
 
 // --- signaling / rtc ---
-let ws;           // WebSocket signaling
-let pc;           // RTCPeerConnection
-let dataChannel;  // WebRTC DataChannel
+let ws;
+let pc;
+let dataChannel;
 let isHost = false;
 
 // --- game state ---
@@ -47,7 +47,6 @@ function connect(host) {
     await ensurePc();
 
     if (isHost) {
-      // Host creates DataChannel + Offer
       dataChannel = pc.createDataChannel("game");
       setupChannel();
       const offer = await pc.createOffer();
@@ -55,7 +54,6 @@ function connect(host) {
       ws.send(JSON.stringify({ offer }));
       console.log("📤 Sent offer");
     } else {
-      // Joiner will receive DataChannel
       pc.ondatachannel = (e) => {
         dataChannel = e.channel;
         setupChannel();
@@ -66,7 +64,8 @@ function connect(host) {
   ws.onerror = (err) => console.error("❌ WebSocket error", err);
 
   ws.onmessage = async (event) => {
-    let msg = JSON.parse(event.data);
+    let msg = {};
+    try { msg = JSON.parse(event.data); } catch { return; }
 
     if (msg.offer && !isHost) {
       console.log("📩 Got offer");
@@ -85,6 +84,7 @@ function connect(host) {
     if (msg.candidate) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+        console.log("➕ Added ICE candidate");
       } catch (e) {
         console.warn("⚠️ ICE add failed", e);
       }
@@ -97,14 +97,13 @@ async function ensurePc() {
   if (pc) return pc;
 
   pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" }
-    ]
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
   });
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
       ws && ws.readyState === 1 && ws.send(JSON.stringify({ candidate: e.candidate }));
+      console.log("📤 Sent ICE candidate");
     }
   };
 
@@ -127,7 +126,9 @@ function setupChannel() {
   dataChannel.onclose = () => console.log("🔻 DataChannel closed");
 
   dataChannel.onmessage = (e) => {
-    let msg = JSON.parse(e.data);
+    let msg = {};
+    try { msg = JSON.parse(e.data); } catch { return; }
+
     if (msg.type === "pos") {
       enemyX = msg.x;
       enemyY = msg.y;
