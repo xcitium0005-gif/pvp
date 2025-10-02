@@ -14,10 +14,7 @@
       text-align: center;
     }
     h2 { margin: 10px 0; }
-    #ui {
-      margin: 10px auto;
-      padding: 10px;
-    }
+    #ui { margin: 10px auto; padding: 10px; }
     button {
       font-size: 18px;
       margin: 8px;
@@ -69,14 +66,8 @@
       border: none;
       color: white;
     }
-    #attackBtn {
-      right: 60px;
-      background: crimson;
-    }
-    #skillBtn {
-      right: 170px;
-      background: royalblue;
-    }
+    #attackBtn { right: 60px; background: crimson; }
+    #skillBtn { right: 170px; background: royalblue; }
     #attackBtn:active { background: darkred; }
     #skillBtn:active { background: navy; }
   </style>
@@ -102,6 +93,7 @@
   <button id="attackBtn">Attack</button>
   <button id="skillBtn">Skill</button>
 
-  <script src="game.js"></script>
+  <!-- Load scripts -->
+  <script type="module" src="game.js"></script>
 </body>
 </html>
