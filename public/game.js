@@ -1,5 +1,6 @@
 // game.js
-import { milaBasicAttack, milaSkill, milaOnHit } from "./mila.js";
+// Main engine
+import { milaBasicAttack, milaSkill, milaOnHit, milaApplyKnockback } from "./mila.js";
 
 let canvas = document.getElementById("game");
 let ctx = canvas.getContext("2d");
@@ -20,8 +21,8 @@ export let state = {
   enemyX: canvas.width * 0.8,
   enemyY: canvas.height * 0.5,
   enemyChar: null,
-  myHP: 5,     // baseline, adjusted on selection
-  enemyHP: 5,
+  myHP: 100,
+  enemyHP: 100,
   projectiles: {},
   nextProjId: 1,
   lastAttackTime: 0
@@ -45,10 +46,6 @@ let milaEnergy = new Image(); milaEnergy.src = "mila_energy.png";
 // ---- Select Character ----
 window.selectChar = function(name) {
   state.myChar = name;
-  if (name==="mila") state.myHP = 4;
-  if (name==="gustav") state.myHP = 5;
-  if (name==="fyero") state.myHP = 6;
-
   if (dataChannel && dataChannel.readyState === "open") {
     dataChannel.send(JSON.stringify({ type:"char", char: state.myChar }));
   }
@@ -207,12 +204,14 @@ function loop() {
     if (now - p.born > p.ttl) { delete state.projectiles[id]; continue; }
     p.x += p.vx; p.y += p.vy;
 
+    // Only owner computes damage
     if (p.owner==="you") {
       const dx=state.enemyX-p.x, dy=state.enemyY-p.y;
       if (Math.hypot(dx,dy)<80) { 
         let dmg = milaOnHit(p,state);
         state.enemyHP=Math.max(0,state.enemyHP-dmg);
 
+        // knockback if orb
         let kb = null;
         if (p.kind==="mila_energy") {
           const len=Math.hypot(dx,dy)||1;
@@ -228,20 +227,22 @@ function loop() {
   // draw arena
   ctx.fillStyle="#2a2a2a"; ctx.fillRect(60,60,canvas.width-120,canvas.height-140);
 
-  // draw enemy (invisible if Mila idle >3s)
+  // draw enemy (if Mila + invisible, do NOT draw)
   if (state.enemyChar) {
-    if (state.enemyChar==="mila" && (performance.now()-state.lastAttackTime>3000)) {
-      // fully invisible to me
+    if (state.enemyChar === "mila" && (performance.now()-state.lastAttackTime>3000)) {
+      // invisible to me, skip drawing
     } else {
       ctx.drawImage(sprites[state.enemyChar], state.enemyX-64, state.enemyY-64, 128,128);
     }
   }
 
-  // draw my player (Mila sees herself semi-transparent if invisible)
+  // draw my player (if Mila + invisible, draw semi-transparent)
   if (state.myChar) {
-    if (state.myChar==="mila") {
-      const invisible = (performance.now()-state.lastAttackTime>3000);
-      if (invisible) ctx.globalAlpha=0.5;
+    if (state.myChar === "mila") {
+      const invisible = (performance.now() - state.lastAttackTime > 3000);
+      if (invisible) {
+        ctx.globalAlpha=0.5; // semi-transparent to self
+      }
       ctx.drawImage(sprites[state.myChar], state.myX-64, state.myY-64, 128,128);
       ctx.globalAlpha=1.0;
     } else {
@@ -260,21 +261,11 @@ function loop() {
   drawHP(state.myX,state.myY,state.myHP);
   drawHP(state.enemyX,state.enemyY,state.enemyHP);
 
-  // End conditions
-  if (state.myHP <= 0) {
-    ctx.fillStyle="white"; ctx.font="40px Arial";
-    ctx.fillText("💀 You Lose!", canvas.width/2-100, canvas.height/2);
-  }
-  if (state.enemyHP <= 0) {
-    ctx.fillStyle="yellow"; ctx.font="40px Arial";
-    ctx.fillText("🏆 You Win!", canvas.width/2-100, canvas.height/2);
-  }
-
   requestAnimationFrame(loop);
 }
 loop();
 
 function drawHP(x,y,hp){
   ctx.fillStyle="red"; ctx.fillRect(x-30,y-70,60,6);
-  ctx.fillStyle="lime"; ctx.fillRect(x-30,y-70,(hp/6)*60,6); // max 6
+  ctx.fillStyle="lime"; ctx.fillRect(x-30,y-70,(hp/100)*60,6);
 }
