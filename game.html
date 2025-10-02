@@ -11,6 +11,7 @@
       text-align: center;
       margin: 0;
       padding: 0;
+      overflow: hidden;
     }
     h2 { margin: 10px 0; }
     canvas {
@@ -32,8 +33,28 @@
       background: #444;
       color: white;
     }
-    button:active {
-      background: #666;
+    button:active { background: #666; }
+
+    /* Joystick container */
+    #joystick {
+      position: absolute;
+      bottom: 60px;
+      left: 60px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid rgba(255,255,255,0.3);
+      touch-action: none;
+    }
+    #stick {
+      position: absolute;
+      left: 40px;
+      top: 40px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.4);
     }
   </style>
 </head>
@@ -50,6 +71,11 @@
   </div>
 
   <canvas id="game" width="600" height="400"></canvas>
+
+  <!-- Joystick UI -->
+  <div id="joystick">
+    <div id="stick"></div>
+  </div>
 
   <script src="game.js"></script>
 </body>
