@@ -1,6 +1,19 @@
+const express = require("express");
 const WebSocket = require("ws");
-const wss = new WebSocket.Server({ port: process.env.PORT || 3000 });
+const path = require("path");
 
+const PORT = process.env.PORT || 3000;
+const app = express();
+
+// Serve static files (game.html, game.js, sprites)
+app.use(express.static(path.join(__dirname, "public")));
+
+const server = app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
+
+// WebSocket signaling
+const wss = new WebSocket.Server({ server });
 let clients = [];
 
 wss.on("connection", (ws) => {
@@ -20,5 +33,3 @@ wss.on("connection", (ws) => {
     console.log("Client disconnected");
   });
 });
-
-console.log("Signaling server running");
